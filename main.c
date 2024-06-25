@@ -1,8 +1,13 @@
+ /*
+ALUNO: Breno Martins Silva
+DRE: 122031418
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #define MAX 100
 
-enum RegExpTag {
+enum RegExpTag{
     TAG_EMPTY,
     TAG_CHAR,
     TAG_STAR,
@@ -10,16 +15,16 @@ enum RegExpTag {
     TAG_UNION,
 };
 
-struct RegExp {
+struct RegExp{
     char tag;
-    union {
-        struct {
+    union{
+        struct{
             char c;
         } ch;
-        struct {
+        struct{
             struct RegExp *filho;
         } un;
-        struct {
+        struct{
             struct RegExp *filho1;
             struct RegExp *filho2;
         } bin;
@@ -44,51 +49,57 @@ static RegExp *parse_basico();
 // Funções para visualização da árvore
 void print_tree(RegExp *tree, int nivel);
 
-// Variável com o próximo dígito
+// Variável com o próximo dígito e a sua posicao
 int c;
+int pos;
+int nParentesesAbertos = 0;
 
-int main(void) {
-    c = getchar();
-    
-    while (c != EOF) {
+// Funcao para avancar o digito e a posicao simultaneamente
+void proxDigito();
+
+int main(void){
+    proxDigito();
+
+    while (c != EOF){
         RegExp *tree = parse_regexp();
+        if (nParentesesAbertos > 0){
+            fprintf(stderr, "Erro de sintaxe na posição %d: esperava ')', encontrei EOF\n", pos);
+            exit(1);
+        }
+        // Nivel 0 porque precisa começar no ponto mais baixo, no caso a raiz
         print_tree(tree, 0);
 
-        // Liberar a arvore
-        c = getchar();
-    }    
+        // Finalizar
+        proxDigito();
+    }
     return 0;
 }
 
-RegExp *new_empty() {
+RegExp *new_empty(){
     RegExp *exp = (RegExp *)malloc(sizeof(RegExp));
     exp->tag = TAG_EMPTY;
     return exp;
 }
-
-RegExp *new_char(char c) {
+RegExp *new_char(char c){
     RegExp *exp = (RegExp *)malloc(sizeof(RegExp));
     exp->tag = TAG_CHAR;
     exp->u.ch.c = c;
     return exp;
 }
-
-RegExp *new_star(RegExp *filho) {
+RegExp *new_star(RegExp *filho){
     RegExp *exp = (RegExp *)malloc(sizeof(RegExp));
     exp->tag = TAG_STAR;
     exp->u.un.filho = filho;
     return exp;
 }
-
-RegExp *new_concat(RegExp *filho1, RegExp *filho2) {
+RegExp *new_concat(RegExp *filho1, RegExp *filho2){
     RegExp *exp = (RegExp *)malloc(sizeof(RegExp));
     exp->tag = TAG_CONCAT;
     exp->u.bin.filho1 = filho1;
     exp->u.bin.filho2 = filho2;
     return exp;
 }
-
-RegExp *new_union(RegExp *filho1, RegExp *filho2) {
+RegExp *new_union(RegExp *filho1, RegExp *filho2){
     RegExp *exp = (RegExp *)malloc(sizeof(RegExp));
     exp->tag = TAG_UNION;
     exp->u.bin.filho1 = filho1;
@@ -96,63 +107,79 @@ RegExp *new_union(RegExp *filho1, RegExp *filho2) {
     return exp;
 }
 
-static RegExp *parse_regexp() {
+static RegExp *parse_regexp(){
     return parse_uniao();
 }
-
-static RegExp *parse_uniao() {
+static RegExp *parse_uniao(){
     RegExp *e1 = parse_concat();
-    if (c == '|') {
-        c = getchar();
+    if (c == '|'){
+        proxDigito();
         RegExp *e2 = parse_uniao();
         e1 = new_union(e1, e2);
     }
+    if ( c== ')' && nParentesesAbertos == 0){
+        fprintf(stderr, "Erro de sintaxe na posição %d: esperava '\\n', encontrei ')'\n", pos);
+        exit(1);        
+    }    
     return e1;
 }
-
-static RegExp *parse_concat() {
+static RegExp *parse_concat(){
     RegExp *e1 = parse_estrela();
-    if (c != '|' && c != '(' && c != ')' && c != '\n' && c != '\0' && c != EOF) {
+    //Se c for um caracter normal
+    if (c != '|' && c != '(' && c != ')' && c != '\n' && c != '\0' && c != EOF){
         RegExp *e2 = parse_concat();
         e1 = new_concat(e1, e2);
     }
     return e1;
 }
-
-static RegExp *parse_estrela() {
+static RegExp *parse_estrela(){
     RegExp *e = parse_basico();
-    while (c == '*') {
-        c = getchar();
+    // Se os digitos seguintes forem estrelas
+    while (c == '*'){
+        proxDigito();
         e = new_star(e);
     }
     return e;
 }
-
-static RegExp *parse_basico() {
+static RegExp *parse_basico(){
     RegExp *e = (RegExp *)malloc(sizeof(RegExp));
-    if (c != '|' && c != '(' && c != ')' && c != '\n' && c != '\0' && c != EOF) {
+    //Se c for um caracter normal
+    if (c != '|' && c != '(' && c != ')' && c != '\n' && c != '\0' && c != EOF){
         e = new_char(c);
-        c = getchar();
-    } else if (c == '(') {
-        c = getchar();
+        proxDigito();
+    }
+    //Se houver parenteses abrindo, chama uma nova expressao 
+    else if (c == '('){
+        proxDigito();
+        nParentesesAbertos++;
         e = parse_regexp();
+        // Fechando parênteses
         if (c == ')') {
-            c = getchar();
+            proxDigito();
+            nParentesesAbertos--;
+        }
+        else if (c == '\n'){
+            fprintf(stderr, "(a\nErro de sintaxe na posição %d: esperava ')', encontrei '\\n'\n", pos);
+            exit(1);
         }
     }
     return e;
 }
-
-void print_tree(RegExp *tree, int nivel) {
-    if (tree == NULL) {
+void proxDigito(){
+    c = getchar();
+    pos++;
+}
+void print_tree(RegExp *tree, int nivel){
+    // Se a arvore estiver vazia, nao continue executando
+    if (tree == NULL){
         return;
     }
-
-    for (int i = 0; i < nivel; ++i) {
+    //Printa as identacoes
+    for (int i = 0; i < nivel; i++){
         printf("  ");
     }
 
-    switch (tree->tag) {
+    switch (tree->tag){
         case TAG_EMPTY:
             printf("EMPTY\n");
             break;
