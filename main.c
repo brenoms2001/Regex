@@ -1,14 +1,7 @@
-/*
-ALUNO: Breno Martins Silva
-DRE: 122031418
-*/
-
-//Cabecalho
 #include <stdio.h>
 #include <stdlib.h>
 #define MAX 100
 
-//Structs
 enum RegExpTag {
     TAG_EMPTY,
     TAG_CHAR,
@@ -34,90 +27,151 @@ struct RegExp {
 };
 typedef struct RegExp RegExp;
 
-//Funcoes de criacao de nos
+// Funções de criação de nós
 RegExp *new_empty();
 RegExp *new_char(char c);
 RegExp *new_star(RegExp *filho);
 RegExp *new_concat(RegExp *filho1, RegExp *filho2);
 RegExp *new_union(RegExp *filho1, RegExp *filho2);
 
-//funcoes de parse
+// Funções de parse
 static RegExp *parse_regexp();
 static RegExp *parse_uniao();
 static RegExp *parse_concat();
 static RegExp *parse_estrela();
 static RegExp *parse_basico();
 
-//Funcoes de criacao e conversao de regex para arvores
-RegExp *regexToTree();
-void printTree(RegExp);
+// Funções para visualização da árvore
+void print_tree(RegExp *tree, int nivel);
 
+// Variável com o próximo dígito
 int c;
 
-int main(void){
-    char expressao[MAX];
-    scanf("%s", expressao);
+int main(void) {
+    c = getchar();
+    
+    while (c != EOF) {
+        RegExp *tree = parse_regexp();
+        print_tree(tree, 0);
 
-    RegExp *arvore = malloc(sizeof(RegExp)); 
-    arvore->tag = TAG_UNION;
-
-    RegExp *conc = malloc(sizeof(RegExp));;
-    conc->tag = TAG_CONCAT;
-
-    RegExp *char1 = malloc(sizeof(RegExp));;
-    char1->tag = TAG_CHAR;
-    char1->u.ch.c = 'a';
-    RegExp *char2 = malloc(sizeof(RegExp));;
-    char2->tag = TAG_CHAR;
-    char2->u.ch.c = 'b';
-
-    arvore->u.bin.filho1 = conc;
-    conc->u.bin.filho1 = char1;
-    conc->u.bin.filho2 = char2;
-
-    RegExp *char3 = malloc(sizeof(RegExp));;
-    char3->tag = TAG_CHAR;
-    char3->u.ch.c = 'c';
-    arvore->u.bin.filho2 = char3;
-
+        // Liberar a arvore
+        c = getchar();
+    }    
     return 0;
 }
 
-RegExp *new_empty(){
-    RegExp *exp = malloc(sizeof(RegExp));
+RegExp *new_empty() {
+    RegExp *exp = (RegExp *)malloc(sizeof(RegExp));
     exp->tag = TAG_EMPTY;
     return exp;
-};
-RegExp *new_char(char c){
-    RegExp *exp = malloc(sizeof(RegExp));
-    exp->tag=TAG_CHAR;
+}
+
+RegExp *new_char(char c) {
+    RegExp *exp = (RegExp *)malloc(sizeof(RegExp));
+    exp->tag = TAG_CHAR;
     exp->u.ch.c = c;
     return exp;
-};
-RegExp *new_star(RegExp *filho){
-    RegExp *exp = malloc(sizeof(RegExp));
+}
+
+RegExp *new_star(RegExp *filho) {
+    RegExp *exp = (RegExp *)malloc(sizeof(RegExp));
     exp->tag = TAG_STAR;
     exp->u.un.filho = filho;
     return exp;
-};
-RegExp *new_concat(RegExp *filho1, RegExp *filho2){
-    RegExp *exp = malloc(sizeof(RegExp));
+}
+
+RegExp *new_concat(RegExp *filho1, RegExp *filho2) {
+    RegExp *exp = (RegExp *)malloc(sizeof(RegExp));
     exp->tag = TAG_CONCAT;
     exp->u.bin.filho1 = filho1;
     exp->u.bin.filho2 = filho2;
     return exp;
-};
-RegExp *new_union(RegExp *filho1, RegExp *filho2){
-    RegExp *exp = malloc(sizeof(RegExp));
+}
+
+RegExp *new_union(RegExp *filho1, RegExp *filho2) {
+    RegExp *exp = (RegExp *)malloc(sizeof(RegExp));
     exp->tag = TAG_UNION;
     exp->u.bin.filho1 = filho1;
     exp->u.bin.filho2 = filho2;
     return exp;
-};
-static RegExp *parse_regexp();
-static RegExp *parse_uniao();
-static RegExp *parse_concat();
-static RegExp *parse_estrela();
-static RegExp *parse_basico();
-RegExp *regexToTree();
-void printTree(RegExp);
+}
+
+static RegExp *parse_regexp() {
+    return parse_uniao();
+}
+
+static RegExp *parse_uniao() {
+    RegExp *e1 = parse_concat();
+    if (c == '|') {
+        c = getchar();
+        RegExp *e2 = parse_uniao();
+        e1 = new_union(e1, e2);
+    }
+    return e1;
+}
+
+static RegExp *parse_concat() {
+    RegExp *e1 = parse_estrela();
+    if (c != '|' && c != '(' && c != ')' && c != '\n' && c != '\0' && c != EOF) {
+        RegExp *e2 = parse_concat();
+        e1 = new_concat(e1, e2);
+    }
+    return e1;
+}
+
+static RegExp *parse_estrela() {
+    RegExp *e = parse_basico();
+    while (c == '*') {
+        c = getchar();
+        e = new_star(e);
+    }
+    return e;
+}
+
+static RegExp *parse_basico() {
+    RegExp *e = (RegExp *)malloc(sizeof(RegExp));
+    if (c != '|' && c != '(' && c != ')' && c != '\n' && c != '\0' && c != EOF) {
+        e = new_char(c);
+        c = getchar();
+    } else if (c == '(') {
+        c = getchar();
+        e = parse_regexp();
+        if (c == ')') {
+            c = getchar();
+        }
+    }
+    return e;
+}
+
+void print_tree(RegExp *tree, int nivel) {
+    if (tree == NULL) {
+        return;
+    }
+
+    for (int i = 0; i < nivel; ++i) {
+        printf("  ");
+    }
+
+    switch (tree->tag) {
+        case TAG_EMPTY:
+            printf("EMPTY\n");
+            break;
+        case TAG_CHAR:
+            printf("CHAR %c\n", tree->u.ch.c);
+            break;
+        case TAG_STAR:
+            printf("STAR\n");
+            print_tree(tree->u.un.filho, nivel + 1);
+            break;
+        case TAG_CONCAT:
+            printf("CONCAT\n");
+            print_tree(tree->u.bin.filho1, nivel + 1);
+            print_tree(tree->u.bin.filho2, nivel + 1);
+            break;
+        case TAG_UNION:
+            printf("UNION\n");
+            print_tree(tree->u.bin.filho1, nivel + 1);
+            print_tree(tree->u.bin.filho2, nivel + 1);
+            break;
+    }
+}
